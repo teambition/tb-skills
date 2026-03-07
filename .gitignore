@@ -1,0 +1,12 @@
+/.aone_copilot/
+user-token.json
+.idea/
+.DS_Store
+*.iml
+*.ipr
+*.iws
+*.idea
+*.iml
+*.ipr
+*.iws
+.aone_copilot
