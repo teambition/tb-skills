@@ -1,7 +1,7 @@
 ---
 name: dingtalk-tb-ai-skill
 description: "Teambition project management via Python scripts: projects, tasks, task traces, comments, files, members. Use when: (1) querying/creating/updating tasks or projects, (2) managing task progress and comments, (3) uploading files to tasks, (4) querying team members. NOT for: non-Teambition platforms, direct API calls without scripts, or operations not covered by available scripts."
-version: 0.0.1
+version: 0.0.2
 metadata:
   {
     "openclaw":
@@ -56,9 +56,6 @@ metadata:
 ## 环境准备
 
 ```bash
-# 安装 uv（如未安装）
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
 # 安装依赖
 cd dingtalk-tb-ai-skill && uv sync
 ```

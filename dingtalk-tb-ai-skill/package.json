@@ -1,6 +1,6 @@
 {
   "name": "dingtalk-tb-ai-skill",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Teambition 项目和任务管理技能。使用 User Token 认证，通过 TQL（查询语言）灵活查询和管理 Teambition 项目、任务、成员等。",
   "keywords": [
     "teambition",
