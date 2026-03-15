@@ -1,6 +1,6 @@
 {
   "name": "dingtalk-tb-ai-skill",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Teambition 项目和任务管理技能。使用 User Token 认证，通过 TQL（查询语言）灵活查询和管理 Teambition 项目、任务、成员等。",
   "keywords": [
     "teambition",
@@ -20,10 +20,10 @@
   "homepage": "https://clawhub.com/skills/dingtalk-tb-ai-skill",
   "repository": {
     "type": "git",
-    "url": "https://github.com/teambition-taskcenter/tb-skills.git"
+    "url": "https://github.com/teambition/tb-skills.git"
   },
   "bugs": {
-    "url": "https://github.com/teambition-taskcenter/tb-skills/issues"
+    "url": "https://github.com/teambition/tb-skills/issues"
   },
   "engines": {
     "python": ">=3.8.0"
@@ -32,7 +32,9 @@
     "uv": ">=0.1.0"
   },
   "clawhub": {
-    "requiresBinaries": ["uv"],
+    "requiresBinaries": [
+      "uv"
+    ],
     "credentials": [
       {
         "name": "TB_USER_TOKEN",
@@ -50,8 +52,8 @@
   },
   "scripts": {
     "setup": "uv sync",
-    "test:user": "uv run scripts/get-current-user.py",
-    "test:tasks": "uv run scripts/query-tasks.py --tql \"executorId = me() AND isDone = false\"",
-    "test:projects": "uv run scripts/query-projects.py --tql \"creatorId = me()\""
+    "test:tasks": "uv run scripts/query_tasks.py --tql \"executorId = me() AND isDone = false\"",
+    "test:projects": "uv run scripts/query_projects.py --tql \"involveMembers = me()\"",
+    "test:members": "uv run scripts/query_members.py --keyword \"test\""
   }
 }

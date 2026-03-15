@@ -1,7 +1,7 @@
 ---
 name: dingtalk-tb-ai-skill
-description: "Teambition project management via Python scripts: projects, tasks, task traces, comments, files, members. Use when: (1) querying/creating/updating tasks or projects, (2) managing task progress and comments, (3) uploading files to tasks, (4) querying team members. NOT for: non-Teambition platforms, direct API calls without scripts, or operations not covered by available scripts."
-version: 0.0.2
+description: "Use for anything related to Teambition tasks and projects. Triggers on: checking my todos, what tasks are due today or this week, create a task, update task status or priority or assignee or note, mark task as done, query overdue tasks, search tasks by keyword, view task details, upload file to task, check team members, query project list, add task comment with @mention, track task progress. NOT for: non-Teambition platforms or Git operations."
+version: 1.0.0
 metadata:
   {
     "openclaw":
@@ -29,131 +29,157 @@ metadata:
   }
 ---
 
-# Teambition Skill
-
-通过 Python 脚本（`uv run`）管理 Teambition 项目、任务和团队协作。
-
 ## 适用场景
 
 ✅ **适合使用本技能：**
-
-- 通过 TQL 查询项目、任务或任务详情
-- 创建、更新或归档任务
-- 管理任务进展、评论和动态
+- 查询我的待办任务、今天/本周到期的任务、逾期任务
+- 创建、更新、归档任务
+- 更新任务状态、优先级、执行人、备注
+- 管理任务进展、评论（支持 @提及）、动态
 - 上传文件到任务
-- 查询企业成员或当前用户信息
-- 更新任务优先级和状态
+- 查询项目列表、项目详情
+- 查询企业成员
+- 管理迭代（创建/开始/完成）
 
-## 不适用场景
-
-❌ **不要使用本技能：**
-
+❌ **不适用场景：**
 - 操作非 Teambition 平台（Jira、Asana 等）
-- 不通过脚本直接调用 REST API
-- 管理脚本未覆盖的 Teambition 组织/管理员设置
 - Git 操作或代码管理 → 直接使用 `git`
+- 管理脚本未覆盖的 Teambition 组织/管理员设置
+
+---
 
 ## 环境准备
-
+> 获取 User Token：[Teambition 开放平台](https://open.teambition.com/user-mcp)
 ```bash
-# 安装依赖
+# 方式 1：环境变量
+export TB_USER_TOKEN="your_token"
+
+# 方式 2：在 dingtalk-tb-ai-skill/ 目录下创建 user-token.json
+# {"userToken": "your_token"}
+
 cd dingtalk-tb-ai-skill && uv sync
 ```
 
-### Token 配置
+---
 
-从 [Teambition 开放平台](https://open.teambition.com/user-mcp) 获取 Token，然后通过以下任一方式配置：
+## 核心规则
 
-```bash
-# 方式 1：环境变量
-export TB_USER_TOKEN="your_token_here"
+1. **`me()`**：TQL 中查询"我的"任务/项目，必须用 `executorId = me()`，禁止硬编码用户 ID
+2. **时区**：`create_task.py` / `update_task.py` / `manage_sprint.py` 已内置东八区→UTC 转换，直接传本地时间即可；不要手动传 UTC 时间（会被再次转换导致偏差）。转换逻辑参考：
+   ```python
+   from datetime import datetime, timedelta
+   user_date = "2026-03-15"
+   dt = datetime.strptime(user_date, "%Y-%m-%d") - timedelta(hours=8)
+   iso_date = dt.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+   # 结果：2026-03-14T16:00:00.000Z
+   ```
+3. **ID→名称**：API 返回的各类 ID 字段均为原始 ID 字符串，**展示给用户前必须转换为可读名称，禁止直接展示原始 ID**。
+   - **需要转换的常见 ID 字段**：
+     | 字段 | 含义 | 转换方式 |
+     |------|------|---------|
+     | `executorId` | 执行人 | `query_members.py --user-ids <ID>` 批量查询 |
+     | `creatorId` | 创建人 | `query_members.py --user-ids <ID>` 批量查询 |
+     | `involveMembers` | 参与人列表 | `query_members.py --user-ids <ID1,ID2,...>` 批量查询 |
+     | `sprintId` | 所属迭代 | `query_project_detail.py <projectId>` 获取迭代列表后匹配 |
+     | `stageId` | 所属任务列 | 任务详情中通常包含 `stageName`，否则需查项目工作流 |
+     | `projectId` | 所属项目 | 项目名通常已在上下文中，或用 `query_project_detail.py` 查询 |
+     | `parentTaskId` | 父任务 | `query_task_detail.py <parentTaskId>` 获取父任务标题 |
+   - **展示任务列表/详情时的必要步骤**：
+     1. 收集所有任务中出现的各类 ID（去重）
+     2. 批量查询对应的名称（人员用 `query_members.py`，项目/迭代/任务用各自的查询脚本）
+     3. 将 ID 替换为名称后再向用户展示
+   - 如果无法确定某个 ID 对应的名称，可展示为"未知"或保留该字段不展示，不要直接展示原始 ID
+   ```bash
+   # 按姓名搜索成员，获取 userId
+   uv run scripts/query_members.py --keyword "张三"
+   # 返回结果中匹配 userId，确认后用于展示或操作
+   
+   # 批量按用户ID查询成员（推荐用于ID转换）
+   uv run scripts/query_members.py --user-ids "id1,id2,id3"
+   ```
+4. **优先级**：数值含义为 `0=紧急 1=高 2=中 3=低`，但**企业通常会自定义优先级名称**，脚本输出的 `priorityLabel` 仅为系统默认值，不代表该企业的真实配置。
+   - **展示优先级名称前必须先查询企业配置**，查询链路：
+     1. 从任务详情获取 `projectId`
+     2. `uv run scripts/query_project_detail.py <projectId> --extra-fields organizationId` 获取 `organizationId`
+     3. `uv run scripts/get_priority_list.py <organizationId>` 获取企业真实优先级列表
+   - 返回结果中每条优先级包含 `priority`（数值）和 `name`（企业自定义名称），以此覆盖默认 label 后再展示
+   - **更新优先级前同样需要先查询**，将用户描述的优先级名称与企业配置匹配后，再用对应的 `priority` 数值调用更新接口
+5. **归档 vs 删除**：归档任务会移入回收站，不在正常列表显示，可通过 `--restore` 恢复；归档不等于删除
+6. **动态 vs 进展**：动态（activity）是系统自动记录的操作历史（状态变更、字段修改等）；进展（trace）是用户手动填写的阶段性状态更新
+7. **迭代操作顺序**：先用 `--action create --project-id <id> --name <名>` 创建迭代获取 sprint-id，再用 `--action start --project-id <id> --sprint-id <id>` 开始，完成后用 `--action complete --project-id <id> --sprint-id <id>`；start/complete 都需要同时传 `--project-id` 和 `--sprint-id`
+8. **状态查询优先**：更新任务状态时，优先使用 `get_task_statuses.py <taskId>` 直接查询该任务的工作流状态列表，无需先获取 projectId；只有创建任务需要初始状态时才用 `get_taskflow_statuses.py`
+9. **按需读文档**：TQL 语法 → `references/tql.md`；进展/评论/动态/归档 → `references/task-ops.md`；错误处理 → `references/error-handling.md`
+10. **文件上传流程**：先用 `upload_file.py` 上传文件获取 `fileToken`，再用 `create_comment.py --file-tokens <token>` 将文件附加到评论；两步均走脚本，无需直接调 API
+11. **ID 链接渲染**：当回复中涉及任务 ID 或项目 ID 时，必须将其渲染为可点击的链接，格式如下：
+    - 任务链接：`https://www.teambition.com/task/{taskId}`
+    - 项目链接：`https://www.teambition.com/project/{projectId}`
+12. **任务的 content = 标题**：API 返回的 `content` 字段就是任务的**标题**，向用户展示时统一使用"标题"而非"内容"，避免混淆；`create_task.py` 用 `--title`，`update_task.py` 用 `--content`，两者语义一致
+13. **空字段隐藏**：展示任务或项目信息时，**值为空、null、0、false 或空数组的字段应当隐藏，不向用户展示**，只展示有实际值的字段。例如：
+    - 进度为 0 → 不展示进度
+    - 截止时间为 null → 不展示截止时间
+    - 备注为空字符串 → 不展示备注
+    - 迭代为 null → 不展示迭代
+    - 标签为空数组 → 不展示标签
+    - 此规则适用于所有可选字段，保持信息展示简洁
+    
+14. **自定义字段更新格式**：使用 `--customfields` 更新任务自定义字段时，不同类型有不同格式：
+    ```bash
+    # 日期类型（date）：value 是数组，包含带 title 的对象，日期格式为 ISO 8601
+    uv run scripts/update_task.py --task-id 'xxx' \
+      --customfields '[{"customfieldId": "字段ID", "value": [{"title": "2026-03-16T00:00:00.000Z"}]}]'
+    
+    # 文本类型（text）：value 是数组，包含带 title 的对象
+    uv run scripts/update_task.py --task-id 'xxx' \
+      --customfields '[{"customfieldId": "字段ID", "value": [{"title": "文本内容"}]}]'
+    
+    # 单选类型（select）：value 是数组，包含带 id 的选项对象
+    uv run scripts/update_task.py --task-id 'xxx' \
+      --customfields '[{"customfieldId": "字段ID", "value": [{"id": "选项ID"}]}]'
+    ```
+    **注意**：查询时字段 ID 为 `cfId`，更新时字段 ID 为 `customfieldId`（不同！）
 
-# 方式 2：Claw 配置文件（~/.openclaw/openclaw.json）
- { "skills": { "entries": { "dingtalk-tb-ai-skill": { "enabled": true, "env": { "TB_USER_TOKEN": "your_token" } } } } }
+15. **自定义字段文件类型展示**：自定义字段中类型为 `work`（文件附件）的字段，展示时必须将文件名渲染为可点击的下载链接，使用字段值中的 `downloadUrl` 字段作为链接地址，格式如下：
+    - 展示格式：`[文件名](downloadUrl)`
+    - 示例：`[面圣材料.md](https://tb-oss-test.oss-cn-shanghai.aliyuncs.com/...)`
+    - 若一个字段包含多个文件，每个文件单独渲染为一个链接
+    - 禁止只展示文件名而不附带链接
 
-```
+---
 
-## 任务查询完整指南
+## 脚本速查
 
-使用 TQL（任务查询语言）查询 Teambition 任务，支持分页，默认自动获取简单详情。
+| 脚本 | 用途 | 关键参数 |
+|------|------|---------|
+| `query_tasks.py` | 查询任务列表（TQL），默认返回：标题、状态、优先级、执行人ID、截止时间、备注、迭代、任务列、开始时间、进度、父任务ID | `--tql <TQL>` `--page-size N` `--page-token T` `--no-details` `--extra-fields f1,f2` |
+| `query_task_detail.py <id1,id2>` | 查询任务详情（支持批量） | `--detail-level simple\|detailed` `--extra-fields f1,f2` |
+| `create_task.py` | 创建任务 | `--title <标题>`（必需）`--project-id` `--executor-id` `--due-date` `--priority` |
+| `update_task.py` | 更新任务（多字段并行） | `--task-id <id>`（必需）`--content` `--executor-id` `--due-date` `--note` `--priority` `--taskflowstatus-id` |
+| `update_task_priority.py` | 单独更新优先级（更新前必须先用 `get_priority_list.py` 查企业配置） | `--task-id <id>` `--priority <0-3>` |
+| `create_comment.py` | 创建评论 | `--task-id <id>` `--content <内容>` `--mention <姓名>` `--mention-id <userId>` `--file-tokens <token>` |
+| `query_projects.py` | 查询项目列表（TQL） | `--tql <TQL>` `--page-size N` `--page-token T` `--no-details` `--include-template` |
+| `query_project_detail.py <id>` | 查询项目详情（支持批量） | `--detail-level simple\|detailed` `--extra-fields f1,f2` |
+| `query_members.py` | 搜索成员（支持批量ID查询） | `--keyword <姓名>` `--user-ids <ID1,ID2,...>` |
+| `get_task_statuses.py <taskId>` | 查询任务工作流状态列表（推荐） | `--q <关键词>` |
+| `get_taskflow_statuses.py <projectId>` | 获取项目工作流状态（创建任务时用） | `--only-start` `--q <关键词>` |
+| `get_custom_fields.py <projectId>` | 获取项目自定义字段配置 | `--cf-ids <IDs>` `--sfc-id <ID>` |
+| `get_scenario_types.py <projectId>` | 获取项目任务类型列表 | `--q <关键词>` `--sfc-ids <IDs>` |
+| `get_priority_list.py <organizationId>` | 获取企业优先级配置 | — |
+| `get_current_user.py` | 获取当前登录用户信息（userId、name、email 等） | — |
+| `create_trace.py` | 添加任务进展 | `--task-id <id>` `--title <标题>` `--status <1-3>` |
+| `upload_file.py` | 上传文件，返回 `fileToken` | `--file-path <路径>` `--scope task:<id>` `--category attachment` |
+| `archive_task.py` | 归档/恢复任务 | `--task-id <id>` `[--restore]` |
+| `query_task_activity.py` | 查询任务动态 | `--task-id <id>` `--actions comment` |
+| `manage_sprint.py` | 迭代管理 | `--action list\|create\|start\|complete` `--project-id <id>` `--sprint-id <id>` `--name <名>` |
 
-### 查询任务列表
-
-```bash
-uv run scripts/query-tasks.py [选项]
-```
-
-**参数说明：**
+### query_task_detail.py 参数说明
 
 | 参数 | 类型 | 必需 | 说明 |
 |------|------|------|------|
-| `--tql` | 字符串 | 否 | 任务查询语言，用于筛选任务 |
-| `--page-size` | 整数 | 否 | 每页大小，默认由 API 决定 |
-| `--page-token` | 字符串 | 否 | 分页令牌，用于获取下一页 |
-| `--no-details` | 布尔 | 否 | 不自动获取任务详情（默认会自动获取简单详情） |
+| `任务ID` | 字符串 | 是 | 任务 ID，逗号分隔支持批量 |
+| `--detail-level` | 字符串 | 否 | `simple`（默认）或 `detailed` |
+| `--extra-fields` | 字符串 | 否 | simple 模式下额外包含的字段，逗号分隔 |
 
-### TQL 快速参考
-
-| 场景 | TQL 表达式 |
-|------|-----------|
-| 我的待办任务 | `executorId = me() AND isDone = false` |
-| 我的已完成任务 | `executorId = me() AND isDone = true` |
-| 我的逾期任务 | `executorId = me() AND isDone = false AND dueDate < startOf(d)` |
-| 本周任务 | `dueDate <= endOf(w) AND dueDate >= startOf(w)` |
-| 今天到期的任务 | `dueDate <= endOf(d) AND dueDate >= startOf(d)` |
-| 高优先级任务 | `priority = 0` |
-| 某项目的任务 | `projectId = '项目ID'` |
-| 查询标题包含关键词的任务 | `title ~ '关键词'` |
-| 本周创建的任务 | `created <= endOf(w) AND created >= startOf(w)` |
-| 过去7天更新的任务 | `updated >= startOf(d, -7d)` |
-
-**完整 TQL 参考**：请查看 [任务 TQL 参考文档](references/general/TQL_REFERENCE.md)
-
-### 常用查询示例
-
-```bash
-# 查询我的待办任务
-uv run scripts/query-tasks.py --tql "executorId = me() AND isDone = false"
-
-# 查询特定项目的任务
-uv run scripts/query-tasks.py --tql "projectId = '项目ID'"
-
-# 本周创建的任务，按创建时间降序
-uv run scripts/query-tasks.py --tql "created <= endOf(w) AND created >= startOf(w) ORDER BY created DESC"
-
-# 过去 7 天更新过的我的任务，按更新时间降序
-uv run scripts/query-tasks.py --tql "executorId = me() AND updated >= startOf(d, -7d) ORDER BY updated DESC"
-
-# 我的逾期未完成任务，按截止时间升序
-uv run scripts/query-tasks.py --tql "executorId = me() AND isDone = false AND dueDate < startOf(d) ORDER BY dueDate ASC"
-
-# 查询标题包含关键词的任务
-uv run scripts/query-tasks.py --tql "title ~ '需求'"
-
-# 只查询任务ID，不获取详情
-uv run scripts/query-tasks.py --no-details
-
-# 组合使用多个参数
-uv run scripts/query-tasks.py --tql "executorId = me() AND isDone = false" --page-size 20
-```
-
-### 查询任务详情
-
-根据任务 ID 查询任务的详细信息，支持简单和详细两种信息级别。
-
-```bash
-uv run scripts/query-tasks-detail.py <任务ID> [选项]
-```
-
-**参数说明：**
-
-| 参数 | 类型 | 必需 | 说明 |
-|------|------|------|------|
-| `任务ID` | 字符串 | 是 | 任务 ID 集合，使用逗号分隔 |
-| `--detail-level` | 字符串 | 否 | 详细程度：`simple`（默认）或 `detailed` |
-| `--extra-fields` | 字符串 | 否 | 简单模式下额外包含的字段，逗号分隔 |
-
-**简单信息（simple，默认）包含字段：**
+**simple（默认）** 包含字段：
 
 | 字段 | 说明 |
 |------|------|
@@ -166,107 +192,19 @@ uv run scripts/query-tasks-detail.py <任务ID> [选项]
 | `priority` | 优先级（0=紧急，1=高，2=中，3=低） |
 | `created` | 创建时间 |
 | `updated` | 更新时间 |
+| `note` | 备注 |
 
-**详细信息（detailed）** 额外包含：`note`（备注）、`sprintId`（迭代 ID）、`stageId`（任务列 ID）、`startDate`（开始时间）、`progress`（进度）、`parentTaskId`（父任务 ID）、自定义字段等 30+ 个字段。
+**detailed** 额外包含：`sprintId`（迭代 ID）`stageId`（任务列 ID）`startDate`（开始时间）`progress`（进度）`parentTaskId`（父任务 ID）及自定义字段等 30+ 字段
 
-```bash
-# 查询单个任务（简单信息）
-uv run scripts/query-tasks-detail.py 67ec9b8c3c6130ac88605c3e
-
-# 查询详细信息
-uv run scripts/query-tasks-detail.py 67ec9b8c3c6130ac88605c3e --detail-level detailed
-```
-
-**更多任务管理功能**（归档、恢复、评论、动态、进展等）请查看 [任务管理完整文档](references/task.md)
-
----
-
-## 项目查询完整指南
-
-使用 TQL（项目查询语言）查询 Teambition 项目，支持分页，默认自动获取简单详情。
-
-### 查询项目列表
-
-```bash
-uv run scripts/query-projects.py [选项]
-```
-
-**参数说明：**
+### query_project_detail.py 参数说明
 
 | 参数 | 类型 | 必需 | 说明 |
 |------|------|------|------|
-| `--tql` | 字符串 | 否 | 项目查询语言，用于筛选项目 |
-| `--page-size` | 整数 | 否 | 每页大小，默认由 API 决定 |
-| `--page-token` | 字符串 | 否 | 分页令牌，用于获取下一页 |
-| `--include-template` | 布尔 | 否 | 是否包含模板项目，默认不包含 |
-| `--no-details` | 布尔 | 否 | 不自动获取项目详情 |
+| `项目ID` | 字符串 | 是 | 项目 ID，逗号分隔支持批量 |
+| `--detail-level` | 字符串 | 否 | `simple`（默认）或 `detailed` |
+| `--extra-fields` | 字符串 | 否 | simple 模式下额外包含的字段，逗号分隔 |
 
-### TQL 快速参考
-
-| 场景 | TQL 表达式 |
-|------|-----------|
-| 我创建的项目 | `creatorId = me()` |
-| 我参与的项目 | `involveMembers = me()` |
-| 按名称搜索 | `nameText ~ '测试'` |
-| 已归档的项目 | `isSuspended = true` |
-| 今天更新的项目 | `updated <= endOf(d) AND updated >= startOf(d)` |
-| 最近7天创建 | `created <= endOf(d, -1d) AND created >= startOf(d, -7d)` |
-| 今天创建的项目 | `created <= endOf(d) AND created >= startOf(d)` |
-| 本周创建的项目 | `created <= endOf(w) AND created >= startOf(w)` |
-| 本月创建的项目 | `created <= endOf(M) AND created >= startOf(M)` |
-| 指定日期之后创建 | `created >= '2026-03-01T00:00:00.000Z'` |
-| 指定日期之前创建 | `created <= '2026-03-31T23:59:59.999Z'` |
-| 指定日期范围创建 | `created >= '2026-03-01T00:00:00.000Z' AND created <= '2026-03-31T23:59:59.999Z'` |
-
-**完整 TQL 参考**：请查看 [项目 TQL 参考文档](references/general/PROJECT_TQL_REFERENCE.md)
-
-**注意**：项目没有截止时间（dueDate）字段，只有创建时间（created）和更新时间（updated）。
-
-### 常用查询示例
-
-```bash
-# 查询我创建的项目
-uv run scripts/query-projects.py --tql "creatorId = me()"
-
-# 查询我参与的项目
-uv run scripts/query-projects.py --tql "involveMembers = me()"
-
-# 按名称搜索项目
-uv run scripts/query-projects.py --tql "nameText ~ '产品开发'"
-
-# 本周创建的项目，按创建时间降序
-uv run scripts/query-projects.py --tql "created <= endOf(w) AND created >= startOf(w) ORDER BY created DESC"
-
-# 今天更新过的项目，按更新时间降序
-uv run scripts/query-projects.py --tql "updated <= endOf(d) AND updated >= startOf(d) ORDER BY updated DESC"
-
-# 过去 7 天创建的我参与的非模板项目
-uv run scripts/query-projects.py --tql "isTemplate = false AND involveMembers = me() AND created >= startOf(d, -7d) ORDER BY created DESC"
-
-# 查询已归档的项目
-uv run scripts/query-projects.py --tql "isSuspended = true"
-
-# 查询本月创建且我参与的项目
-uv run scripts/query-projects.py --tql "created >= startOf(M) AND involveMembers = me()"
-```
-
-### 查询项目详情
-
-根据项目 ID 查询项目的详细信息，支持简单和详细两种信息级别。
-
-```bash
-uv run scripts/query-projects-detail.py <项目ID> [选项]
-```
-
-**参数说明：**
-
-| 参数 | 类型 | 必需 | 说明 |
-|------|------|------|------|
-| `项目ID` | 字符串 | 是 | 项目 ID 集合，使用逗号分隔 |
-| `--detail-level` | 字符串 | 否 | 详细程度：`simple`（默认）或 `detailed` |
-| `--extra-fields` | 字符串 | 否 | 简单模式下额外包含的字段，逗号分隔 |
-
-**简单信息（simple，默认）包含字段：**
+**simple（默认）** 包含字段：
 
 | 字段 | 说明 |
 |------|------|
@@ -281,155 +219,194 @@ uv run scripts/query-projects-detail.py <项目ID> [选项]
 | `created` | 创建时间 |
 | `updated` | 更新时间 |
 
-**详细信息（detailed）** 额外包含：`logo`（项目 LOGO）、`organizationId`（企业 ID）、`uniqueIdPrefix`（任务 ID 前缀）、`startDate`（开始时间）、`endDate`（结束时间）等 20+ 个字段。
-
-```bash
-# 查询单个项目（简单信息）
-uv run scripts/query-projects-detail.py 67ec9b8c3c6130ac88605c3e
-
-# 查询详细信息
-uv run scripts/query-projects-detail.py 67ec9b8c3c6130ac88605c3e --detail-level detailed
-
-# 查询多个项目
-uv run scripts/query-projects-detail.py 67ec9b8c3c6130ac88605c3e,67ec9b8c3c6130ac88605c3f
-```
-
-**更多项目管理功能**请查看 [项目管理完整文档](references/project.md)
+**detailed** 额外包含：`logo`（项目 LOGO）`organizationId`（企业 ID）`uniqueIdPrefix`（任务 ID 前缀）`startDate`（开始时间）`endDate`（结束时间）等 20+ 字段
 
 ---
 
-## 常用命令
+## TQL 快速参考
 
-### 用户与成员
+### 任务 TQL 常用场景
+
+| 场景 | TQL |
+|------|-----|
+| 我的待办任务 | `executorId = me() AND isDone = false` |
+| 我的逾期任务 | `executorId = me() AND isDone = false AND dueDate < startOf(d)` |
+| 今天截止的任务 | `executorId = me() AND dueDate >= startOf(d) AND dueDate <= endOf(d)` |
+| 本周截止的任务 | `executorId = me() AND dueDate >= startOf(w) AND dueDate <= endOf(w)` |
+| 即将逾期（未来3天） | `executorId = me() AND isDone = false AND dueDate >= startOf(d) AND dueDate <= endOf(d, 3d)` |
+| 过去7天更新的任务 | `executorId = me() AND updated >= startOf(d, -7d)` |
+| 高优先级未完成 | `priority = 0 AND isDone = false` |
+| 标题模糊搜索 | `title ~ '关键词'` |
+| 全文搜索（标题+备注） | `text ~ '关键词'` |
+| 指定项目的任务 | `projectId = 'xxx'` |
+
+> 完整 TQL 语法（字段、运算符、时间函数）→ `references/tql.md`
+
+### 项目 TQL 常用场景
+
+| 场景 | TQL |
+|------|-----|
+| 我参与的项目 | `involveMembers = me()` |
+| 我创建的项目 | `creatorId = me()` |
+| 按名称搜索 | `nameText ~ '关键词'` |
+| 已归档的项目 | `isSuspended = true` |
+| 今天更新的项目 | `updated >= startOf(d) AND updated <= endOf(d)` |
+| 今天创建的项目 | `created >= startOf(d) AND created <= endOf(d)` |
+| 本周创建的项目 | `created >= startOf(w) AND created <= endOf(w)` |
+| 本月创建的项目 | `created >= startOf(M) AND created <= endOf(M)` |
+| 过去7天创建的项目 | `created >= startOf(d, -7d)` |
+| 指定日期范围创建 | `created >= '2026-03-01T00:00:00.000Z' AND created <= '2026-03-31T23:59:59.999Z'` |
+
+> ⚠️ 项目没有截止时间（dueDate）字段，只有 `created` 和 `updated`。
+>
+> 完整项目 TQL → `references/project-tql.md`
+
+---
+
+## 常用命令示例
+
+### 查询任务
 
 ```bash
-# 获取当前用户信息
-uv run scripts/get-current-user.py
+# 我的待办任务
+uv run scripts/query_tasks.py --tql "executorId = me() AND isDone = false"
+# 注意：返回的 executorId 是原始 ID，需批量调用 query_members.py --user-ids 转换为姓名后展示
 
-# 按关键字或 ID 搜索成员
-uv run scripts/query-members.py --keyword "张三"
+# 我的逾期任务，按截止时间升序
+uv run scripts/query_tasks.py --tql "executorId = me() AND isDone = false AND dueDate < startOf(d) ORDER BY dueDate ASC"
+# 返回的 executorId 需批量转换为姓名：uv run scripts/query_members.py --user-ids "<id1,id2,...>"
+
+# 本周截止的任务
+uv run scripts/query_tasks.py --tql "executorId = me() AND dueDate >= startOf(w) AND dueDate <= endOf(w)"
+
+# 标题搜索
+uv run scripts/query_tasks.py --tql "title ~ '需求'"
+
+# 查询任务详情（simple 默认，含 note）
+uv run scripts/query_task_detail.py <taskId>
+
+# 查询详细信息（含自定义字段等）
+uv run scripts/query_task_detail.py <taskId> --detail-level detailed
+
+# 批量查询多个任务
+uv run scripts/query_task_detail.py id1,id2,id3
 ```
 
-### 任务 — 创建
+### 创建任务
 
 ```bash
 # 基本创建
-uv run scripts/create-task.py \
-  --project-id "项目ID" \
-  --content "任务标题"
+uv run scripts/create_task.py --project-id 'xxx' --title '完成需求文档'
 
 # 完整参数创建
-uv run scripts/create-task.py \
-  --project-id "项目ID" \
-  --content "任务标题" \
-  --executor-id "执行者ID" \
-  --start-date "2026-03-15" \
-  --due-date "2026-03-20" \
-  --priority "1" \
-  --note "任务描述"
+uv run scripts/create_task.py \
+  --project-id 'xxx' \
+  --title '实现登录模块' \
+  --executor-id 'uid' \
+  --due-date '2026-04-01' \
+  --priority 1 \
+  --note '参考设计稿'
 ```
 
-### 任务 — 更新
+### 更新任务
 
 ```bash
-# 更新任务状态
-uv run scripts/update-task-status.py --task-id "任务ID" --status-id "状态ID"
+# 更新标题和优先级（多字段并行执行）
+uv run scripts/update_task.py --task-id 'xxx' --content '新标题' --priority 0
 
-# 更新优先级（0=紧急, 1=高, 2=中, 3=低）
-uv run scripts/user-update-task-priority.py --task-id "任务ID" --priority "0"
+# 更新截止日期和执行人
+uv run scripts/update_task.py --task-id 'xxx' --due-date '2026-04-01' --executor-id 'uid'
 
-# 更新任务备注
-uv run scripts/update-task-note.py --task-id "任务ID" --note "更新后的备注"
+# 更新任务状态（先查询状态 ID）
+uv run scripts/get_task_statuses.py <taskId>
+uv run scripts/update_task.py --task-id 'xxx' --taskflowstatus-id '状态ID'
+
+# 单独更新优先级
+uv run scripts/update_task_priority.py --task-id 'xxx' --priority 0
 ```
 
-### 任务 — 归档与恢复
+### 查询项目
 
 ```bash
-# 归档任务（移入回收站）
-uv run scripts/call-user-api.py PUT "v3/task/任务ID/archive"
+# 我参与的项目
+uv run scripts/query_projects.py --tql "involveMembers = me()"
 
-# 恢复任务
-uv run scripts/call-user-api.py POST "v3/task/任务ID/restore" '{}'
+# 按名称搜索
+uv run scripts/query_projects.py --tql "nameText ~ '产品开发'"
+
+# 查询项目详情
+uv run scripts/query_project_detail.py <projectId>
+
+# 获取 organizationId（用于查询优先级配置）
+uv run scripts/query_project_detail.py <projectId> --extra-fields organizationId
 ```
 
-### 任务评论与动态
+### 查询成员和当前用户
 
 ```bash
-# 创建评论（支持附件和 @提及）
-uv run scripts/call-user-api.py POST "v3/task/任务ID/comment" '{"content": "评论内容"}'
+# 按姓名搜索成员
+uv run scripts/query_members.py --keyword '张三'
 
-# 查询任务动态
-uv run scripts/call-user-api.py GET "v3/task/任务ID/activity/list"
+# 批量按用户ID查询成员（推荐用于ID转换）
+uv run scripts/query_members.py --user-ids "id1,id2,id3"
+
+# 获取当前登录用户信息（userId、name、email 等）
+uv run scripts/get_current_user.py
 ```
 
-### 任务进展
+### 创建评论（含 @提及）
 
 ```bash
-# 获取任务进展列表
-uv run scripts/call-user-api.py GET "v3/task/任务ID/traces"
+# 创建评论并 @张三（--mention 接受姓名，脚本自动查询 userId）
+uv run scripts/create_comment.py \
+  --task-id 'xxx' \
+  --content '请张三确认一下' \
+  --mention '张三'
 
-# 创建任务进展
-uv run scripts/call-user-api.py POST "v3/task/任务ID/trace/create" '{"title":"已完成需求分析","content":""}'
+# @多人（逗号分隔）
+uv run scripts/create_comment.py \
+  --task-id 'xxx' \
+  --content '请张三和李四评审' \
+  --mention '张三,李四'
+
+# 已知 userId 时可直接用 --mention-id
+uv run scripts/create_comment.py \
+  --task-id 'xxx' \
+  --content '已更新' \
+  --mention-id '61cad8021deea2ac89a4cbf3'
 ```
 
 ### 文件上传
 
 ```bash
-# 上传文件到任务
-uv run scripts/upload-file.py --task-id "任务ID" --file-path "/path/to/file"
+# 第一步：上传文件，获取 fileToken
+uv run scripts/upload_file.py \
+  --file-path '/path/to/doc.pdf' \
+  --scope 'task:<taskId>' \
+  --category attachment
+
+# 第二步：将 fileToken 附加到评论
+uv run scripts/create_comment.py \
+  --task-id 'xxx' \
+  --content '附件已上传，请查收' \
+  --file-tokens 'token1'
 ```
+
+---
 
 ## 分页查询
 
-大多数查询命令支持分页：
+`query_tasks.py` 和 `query_projects.py` 均支持分页：
 
-- `--page-size`：每页记录数（默认 30，最大 100）
-- `--page-token`：传入上次返回的 `nextPageToken` 获取下一页
+| 参数 | 说明 |
+|------|------|
+| `--page-size <N>` | 每页记录数（默认由 API 决定） |
+| `--page-token <T>` | 传入上次返回的 `nextPageToken` 获取下一页 |
 
 ```bash
 # 第一页
-uv run scripts/query-tasks.py --tql "executorId = me()" --page-size 20
+uv run scripts/query_tasks.py --tql "executorId = me()" --page-size 20
 
-# 下一页（使用上次返回的 nextPageToken）
-uv run scripts/query-tasks.py --tql "executorId = me()" --page-size 20 --page-token "上次返回的TOKEN"
+# 下一页（使用上次输出中的 nextPageToken）
+uv run scripts/query_tasks.py --tql "executorId = me()" --page-size 20 --page-token "上次返回的TOKEN"
 ```
-
-## 日期时区转换
-
-日期需从东八区（用户输入）转换为 UTC（API 格式）：
-
-- **用户输入**：`2026-03-15`（东八区）
-- **API 格式**：`2026-03-14T16:00:00.000Z`（UTC，减去 8 小时）
-
-```python
-from datetime import datetime, timedelta
-
-user_date = "2026-03-15"
-dt = datetime.strptime(user_date, "%Y-%m-%d") - timedelta(hours=8)
-iso_date = dt.strftime("%Y-%m-%dT%H:%M:%S.000Z")
-# 结果：2026-03-14T16:00:00.000Z
-```
-
-## 参考文档
-
-- [创建任务](references/create-task.md) — 任务创建完整指南（字段映射、自定义字段、辅助脚本）
-- [更新任务](references/update-task.md) — 更新任务各字段详细指南（并行更新、自定义字段）
-- [用户与成员](references/user.md) — 获取当前用户信息、查询企业成员
-- [优先级](references/priority.md) — 查询企业优先级配置、更新任务优先级
-- [任务管理](references/task.md) — 任务查询和管理完整参考（归档、恢复、评论、动态、进展）
-- [项目管理](references/project.md) — 项目查询完整参考（TQL 筛选、详情级别）
-- [任务进展](references/task-trace.md) — 进展跟踪（获取/创建进展、状态标记）
-- [文件上传](references/file-upload.md) — 上传文件到任务或项目
-- [TQL 参考](references/general/TQL_REFERENCE.md) — 任务查询语言完整语法
-- [项目 TQL](references/general/PROJECT_TQL_REFERENCE.md) — 项目查询语言完整语法
-- [最佳实践](references/general/BEST_PRACTICES.md) — 使用约束与最佳实践
-- [错误处理](references/general/ERROR_HANDLING.md) — 常见错误及解决方案
-
-## 注意事项
-
-- 运行脚本前先 `cd dingtalk-tb-ai-skill`
-- 在 TQL 中使用 `me()` 表示当前认证用户
-- 使用不熟悉的字段前先查阅参考文档，不要猜测参数名
-- 优先级值：`0`=紧急、`1`=高、`2`=中、`3`=低
-- 创建任务时日期转为 UTC，查询展示时转回东八区
-- 首次操作建议在测试项目中验证
