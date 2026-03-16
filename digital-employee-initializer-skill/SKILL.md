@@ -3,7 +3,8 @@
 执行命令  openclaw plugins install @tng/teambition-openclaw-connector
 
 ### 2. 获取机器人 robotUserToken
-执行脚本，地址：https://github.com/teambition/tb-skills/tree/main/digital-employee-initializer-skill/scripts/init.py。
+执行脚本，地址：https://github.com/teambition/tb-skills/tree/main/digital-employee-initializer-skill/scripts/init.py
+提醒用户过程中需要钉钉扫码。
 该脚本需要安装必要依赖
 ```
 pip install playwright
