@@ -1,5 +1,5 @@
 {
-  "name": "dingtalk-tb-ai-skill",
+  "name": "dingtalk-teambition",
   "version": "0.0.3",
   "description": "Teambition 项目和任务管理技能。使用 User Token 认证，通过 TQL（查询语言）灵活查询和管理 Teambition 项目、任务、成员等。",
   "keywords": [
@@ -17,7 +17,7 @@
     "Teambition Team"
   ],
   "license": "MIT",
-  "homepage": "https://clawhub.com/skills/dingtalk-tb-ai-skill",
+  "homepage": "https://clawhub.com/skills/dingtalk-teambition",
   "repository": {
     "type": "git",
     "url": "https://github.com/teambition/tb-skills.git"
@@ -37,7 +37,7 @@
     ],
     "credentials": [
       {
-        "name": "TB_USER_TOKEN",
+        "name": "TEAMBITION_USER_TOKEN",
         "description": "Teambition User Token (用户访问令牌)",
         "docs": "https://open.teambition.com/user-mcp",
         "storageMethod": "environment variable or user-token.json"

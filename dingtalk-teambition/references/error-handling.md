@@ -7,7 +7,7 @@
 **原因**：Token 无效或过期。
 
 **解决**：
-1. 检查环境变量：`echo $TB_USER_TOKEN`
+1. 检查环境变量：`echo $TEAMBITION_USER_TOKEN`
 2. 检查 `user-token.json` 是否存在且格式正确：`{"userToken": "your_token"}`
 3. 重新获取 Token
 
@@ -84,7 +84,7 @@ uv run scripts/query_members.py --keyword 'zhangsan@company.com'
 **解决**：
 ```bash
 # 方式 1：环境变量
-export TB_USER_TOKEN="your_token_here"
+export TEAMBITION_USER_TOKEN="your_token_here"
 
 # 方式 2：配置文件（在 teambition/ 目录下创建）
 echo '{"userToken": "your_token_here"}' > user-token.json

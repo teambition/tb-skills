@@ -1,5 +1,5 @@
 ---
-name: dingtalk-tb-ai-skill
+name: dingtalk-teambition
 description: "Use for anything related to Teambition tasks and projects. Triggers on: checking my todos, what tasks are due today or this week, create a task, update task status or priority or assignee or note, mark task as done, query overdue tasks, search tasks by keyword, view task details, upload file to task, check team members, query project list, add task comment with @mention, track task progress. NOT for: non-Teambition platforms or Git operations."
 version: 1.0.0
 metadata:
@@ -7,7 +7,7 @@ metadata:
     "openclaw":
       {
         "requires": { "bins": ["python3", "uv"] },
-        "primaryEnv": "TB_USER_TOKEN",
+        "primaryEnv": "TEAMBITION_USER_TOKEN",
         "install":
           [
             {
@@ -52,12 +52,12 @@ metadata:
 > 获取 User Token：[Teambition 开放平台](https://open.teambition.com/user-mcp)
 ```bash
 # 方式 1：环境变量
-export TB_USER_TOKEN="your_token"
+export TEAMBITION_USER_TOKEN="your_token"
 
-# 方式 2：在 dingtalk-tb-ai-skill/ 目录下创建 user-token.json
+# 方式 2：在 dingtalk-teambition/ 目录下创建 user-token.json
 # {"userToken": "your_token"}
 
-cd dingtalk-tb-ai-skill && uv sync
+cd dingtalk-teambition && uv sync
 ```
 
 ---

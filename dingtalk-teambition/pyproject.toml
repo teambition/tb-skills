@@ -1,5 +1,5 @@
 [project]
-name = "dingtalk-tb-ai-skill"
+name = "dingtalk-teambition"
 version = "1.0.0"
 description = "Teambition AI Skill - 项目任务管理"
 requires-python = ">=3.8"

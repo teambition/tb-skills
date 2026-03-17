@@ -23,7 +23,7 @@ uv sync
 
 **方式一：环境变量（推荐）**
 ```bash
-export TB_USER_TOKEN="your_teambition_user_token"
+export TEAMBITION_USER_TOKEN="your_teambition_user_token"
 ```
 
 **方式二：配置文件**
@@ -127,7 +127,7 @@ uv run scripts/query_projects.py --tql "nameText ~ '产品开发'"
 ## 项目结构
 
 ```
-dingtalk-tb-ai-skill/
+dingtalk-teambition/
 ├── scripts/           # 核心脚本目录
 │   ├── query_tasks.py
 │   ├── create_task.py

@@ -16,7 +16,12 @@ API_BASE = "https://open.teambition.com/api"
 # ---------- Token ----------
 
 def load_token() -> str:
-    """读取 User Token。优先环境变量 TB_USER_TOKEN，fallback user-token.json。"""
+    """读取 User Token。优先环境变量 TEAMBITION_USER_TOKEN，兼容旧版 TB_USER_TOKEN，fallback user-token.json。"""
+    token = os.environ.get("TEAMBITION_USER_TOKEN")
+    if token:
+        return token
+    
+    # 兼容旧版环境变量名
     token = os.environ.get("TB_USER_TOKEN")
     if token:
         return token
@@ -38,7 +43,7 @@ def load_token() -> str:
             except Exception:
                 pass
 
-    print("❌ 无法获取 User Token。请设置环境变量 TB_USER_TOKEN 或创建 user-token.json。", file=sys.stderr)
+    print("❌ 无法获取 User Token。请设置环境变量 TEAMBITION_USER_TOKEN（或兼容旧版 TB_USER_TOKEN）或创建 user-token.json。", file=sys.stderr)
     sys.exit(1)
 
 
