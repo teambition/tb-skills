@@ -72,17 +72,28 @@ def main() -> None:
 
 必需:
   --file-path <路径>      本地文件路径
-  --scope <scope>         业务范围（task:<taskId> | project:<projectId> | rich-text:<id>）
+  --scope <scope>         业务范围
+                          - 评论附件: task:<taskId>
+                          - 文件类型自定义字段: task:<taskId>/attachment
+                          - 项目: project:<projectId>
+                          - 富文本: rich-text:<id>
   --category <类别>       attachment（推荐）| rich-text | rich-text-attachment | work
 
 可选:
   --help                  显示帮助
 
 示例:
+  # 上传文件到评论附件
   uv run scripts/upload_file.py \\
     --file-path '/path/to/doc.pdf' \\
     --scope 'task:67ec9b8c3c6130ac88605c3e' \\
     --category 'attachment'
+
+  # 上传文件到文件类型自定义字段（注意 scope 格式）
+  uv run scripts/upload_file.py \\
+    --file-path '/path/to/doc.pdf' \\
+    --scope 'task:67ec9b8c3c6130ac88605c3e/attachment' \\
+    --category 'work'
 
 输出: JSON 包含 fileToken，可用于评论附件或自定义字段""")
         sys.exit(0)

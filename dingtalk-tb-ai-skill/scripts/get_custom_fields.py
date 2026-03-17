@@ -25,6 +25,11 @@ def get_custom_fields(
 
     data = call_api.get(f"v3/project/{project_id}/customfield/search", params=params)
     fields = data.get("result", [])
+    # 为每个字段添加 customfieldId 字段，方便后续更新操作使用
+    # API 返回的 id 字段在更新时需要作为 customfieldId 使用
+    for field in fields:
+        if "id" in field and "customfieldId" not in field:
+            field["customfieldId"] = field["id"]
     print(json.dumps(fields, ensure_ascii=False, indent=2))
 
 

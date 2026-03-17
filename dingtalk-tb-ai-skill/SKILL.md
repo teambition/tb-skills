@@ -113,7 +113,7 @@ cd dingtalk-tb-ai-skill && uv sync
 11. **ID 链接渲染**：当回复中涉及任务 ID 或项目 ID 时，必须将其渲染为可点击的链接，格式如下：
     - 任务链接：`https://www.teambition.com/task/{taskId}`
     - 项目链接：`https://www.teambition.com/project/{projectId}`
-12. **任务的 content = 标题**：API 返回的 `content` 字段就是任务的**标题**，向用户展示时统一使用"标题"而非"内容"，避免混淆；`create_task.py` 用 `--title`，`update_task.py` 用 `--content`，两者语义一致
+12. **任务的 content = 标题**：API 返回的 `content` 字段就是任务的**标题**，向用户展示时统一使用"标题"而非"内容"，避免混淆；`create_task.py` 和 `update_task.py` 都统一使用 `--title` 参数
 13. **空字段隐藏**：展示任务或项目信息时，**值为空、null、0、false 或空数组的字段应当隐藏，不向用户展示**，只展示有实际值的字段。例如：
     - 进度为 0 → 不展示进度
     - 截止时间为 null → 不展示截止时间
@@ -127,22 +127,43 @@ cd dingtalk-tb-ai-skill && uv sync
     # 日期类型（date）：value 是数组，包含带 title 的对象，日期格式为 ISO 8601
     uv run scripts/update_task.py --task-id 'xxx' \
       --customfields '[{"customfieldId": "字段ID", "value": [{"title": "2026-03-16T00:00:00.000Z"}]}]'
-    
     # 文本类型（text）：value 是数组，包含带 title 的对象
     uv run scripts/update_task.py --task-id 'xxx' \
       --customfields '[{"customfieldId": "字段ID", "value": [{"title": "文本内容"}]}]'
-    
     # 单选类型（select）：value 是数组，包含带 id 的选项对象
     uv run scripts/update_task.py --task-id 'xxx' \
       --customfields '[{"customfieldId": "字段ID", "value": [{"id": "选项ID"}]}]'
     ```
-    **注意**：查询时字段 ID 为 `cfId`，更新时字段 ID 为 `customfieldId`（不同！）
 
-15. **自定义字段文件类型展示**：自定义字段中类型为 `work`（文件附件）的字段，展示时必须将文件名渲染为可点击的下载链接，使用字段值中的 `downloadUrl` 字段作为链接地址，格式如下：
+15. **文件类型自定义字段上传**：使用 `upload_file_to_customfield.py` 一站式上传文件到自定义字段：
+    ```bash
+    uv run scripts/upload_file_to_customfield.py \
+      --task-id '<taskId>' \
+      --file-path '/path/to/file.pdf' \
+      --customfield-id '<字段ID>'
+    ```
+
+16. **自定义字段文件类型展示**：自定义字段中类型为 `work`（文件附件）的字段，展示时必须将文件名渲染为可点击的下载链接，使用字段值中的 `downloadUrl` 字段作为链接地址，格式如下：
     - 展示格式：`[文件名](downloadUrl)`
-    - 示例：`[面圣材料.md](https://tb-oss-test.oss-cn-shanghai.aliyuncs.com/...)`
+    - 示例：`[材料.md](https://xxx.com/...)`
     - 若一个字段包含多个文件，每个文件单独渲染为一个链接
     - 禁止只展示文件名而不附带链接
+
+17. **批量任务表格输出**：当查询返回**多个任务**（2个及以上）时，**默认使用表格形式展示**，表格列应包含：标题、状态、优先级、执行人、截止时间。单行任务仍使用文本段落形式展示，保持信息清晰易读。
+
+18. **破坏性操作需确认**：执行**归档任务**（`archive_task.py`）、**删除**等不可逆或影响较大的操作前，**必须先向用户确认**，展示操作对象（任务标题/ID）和操作类型，获得明确同意后再执行。例如：
+    - "确认归档任务「完成需求文档」(ID: xxx)吗？归档后可从回收站恢复。"
+    - "确认删除该评论吗？删除后无法恢复。"
+
+19. **空字段不返回**：API 查询任务详情时，**值为空的自定义字段不会被返回**。如果一个文件类型字段从未被赋值过，`customfields` 数组中不会包含该字段。要查看任务可填写的所有自定义字段，需要：
+    ```bash
+    # 1. 从任务详情获取 sfcId（任务类型ID）和 projectId
+    uv run scripts/query_task_detail.py <taskId> --detail-level detailed
+    
+    # 2. 查询该任务类型可用的所有自定义字段
+    uv run scripts/get_custom_fields.py <projectId> --sfc-id <sfcId>
+    ```
+    返回结果中 type 为 `work` 的字段就是文件类型字段
 
 ---
 
@@ -153,7 +174,7 @@ cd dingtalk-tb-ai-skill && uv sync
 | `query_tasks.py` | 查询任务列表（TQL），默认返回：标题、状态、优先级、执行人ID、截止时间、备注、迭代、任务列、开始时间、进度、父任务ID | `--tql <TQL>` `--page-size N` `--page-token T` `--no-details` `--extra-fields f1,f2` |
 | `query_task_detail.py <id1,id2>` | 查询任务详情（支持批量） | `--detail-level simple\|detailed` `--extra-fields f1,f2` |
 | `create_task.py` | 创建任务 | `--title <标题>`（必需）`--project-id` `--executor-id` `--due-date` `--priority` |
-| `update_task.py` | 更新任务（多字段并行） | `--task-id <id>`（必需）`--content` `--executor-id` `--due-date` `--note` `--priority` `--taskflowstatus-id` |
+| `update_task.py` | 更新任务（多字段并行） | `--task-id <id>`（必需）`--title` `--executor-id` `--due-date` `--note` `--priority` `--taskflowstatus-id` |
 | `update_task_priority.py` | 单独更新优先级（更新前必须先用 `get_priority_list.py` 查企业配置） | `--task-id <id>` `--priority <0-3>` |
 | `create_comment.py` | 创建评论 | `--task-id <id>` `--content <内容>` `--mention <姓名>` `--mention-id <userId>` `--file-tokens <token>` |
 | `query_projects.py` | 查询项目列表（TQL） | `--tql <TQL>` `--page-size N` `--page-token T` `--no-details` `--include-template` |
@@ -312,7 +333,7 @@ uv run scripts/create_task.py \
 
 ```bash
 # 更新标题和优先级（多字段并行执行）
-uv run scripts/update_task.py --task-id 'xxx' --content '新标题' --priority 0
+uv run scripts/update_task.py --task-id 'xxx' --title '新标题' --priority 0
 
 # 更新截止日期和执行人
 uv run scripts/update_task.py --task-id 'xxx' --due-date '2026-04-01' --executor-id 'uid'
@@ -405,8 +426,8 @@ uv run scripts/create_comment.py \
 
 ```bash
 # 第一页
-uv run scripts/query_tasks.py --tql "executorId = me()" --page-size 20
+uv run scripts/query_tasks.py --tql "executorId = me()" --page-size 50
 
 # 下一页（使用上次输出中的 nextPageToken）
-uv run scripts/query_tasks.py --tql "executorId = me()" --page-size 20 --page-token "上次返回的TOKEN"
+uv run scripts/query_tasks.py --tql "executorId = me()" --page-size 50 --page-token "上次返回的TOKEN"
 ```

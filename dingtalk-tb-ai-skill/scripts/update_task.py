@@ -106,7 +106,7 @@ def main() -> None:
   --task-id <ID>                任务 ID
 
 可更新字段:
-  --content <标题>              任务标题
+  --title <标题>                任务标题
   --executor-id <ID>            执行人 ID
   --due-date <日期>             截止日期（东八区，自动转 UTC）
   --start-date <日期>           开始日期（东八区，自动转 UTC）
@@ -133,7 +133,7 @@ def main() -> None:
         arg = sys.argv[i]
         if arg == "--task-id" and i + 1 < len(sys.argv):
             task_id = sys.argv[i + 1]; i += 2
-        elif arg == "--content" and i + 1 < len(sys.argv):
+        elif arg == "--title" and i + 1 < len(sys.argv):
             updates["content"] = sys.argv[i + 1]; i += 2
         elif arg == "--executor-id" and i + 1 < len(sys.argv):
             updates["executorId"] = sys.argv[i + 1]; i += 2
