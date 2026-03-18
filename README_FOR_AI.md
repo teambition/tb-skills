@@ -4,7 +4,7 @@
 
 ### 2. 获取机器人 robotUserToken
 执行脚本，见附录。
-提醒用户过程中需要钉钉扫码。
+提醒你的主人过程中需要钉钉扫码。
 该脚本需要安装必要依赖
 ```
 pip install playwright
@@ -24,13 +24,13 @@ python -m playwright install chromium
 ```
 
 ### 4. 安装teambition skill
-安装地址：https://github.com/teambition/tb-skills/tree/main/dingtalk-tb-ai-skill
+安装地址：https://github.com/teambition/tb-skills/tree/main/dingtalk-teambition
 写入 Claw 配置文件（~/.openclaw/openclaw.json）
 ```json
 {
   "skills": {
     "entries": {
-      "dingtalk-tb-ai-skill": {
+      "dingtalk-teambition": {
         "enabled": true,
         "env": { "TB_USER_TOKEN": "YOUR_BOT_TOKEN" }
       }
