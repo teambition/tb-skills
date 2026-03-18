@@ -32,7 +32,7 @@ python -m playwright install chromium
     "entries": {
       "dingtalk-teambition": {
         "enabled": true,
-        "env": { "TB_USER_TOKEN": "YOUR_BOT_TOKEN" }
+        "env": { "TEAMBITION_USER_TOKEN": "YOUR_BOT_TOKEN" }
       }
     }
   }
