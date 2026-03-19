@@ -49,7 +49,7 @@ metadata:
 ---
 
 ## 环境准备
-> 获取 User Token：[Teambition 开放平台](https://open.teambition.com/user-mcp)
+> 获取 User Token：[Teambition UserToken自助申请](https://open.teambition.com/user-mcp)
 ```bash
 # 方式 1：环境变量
 export TEAMBITION_USER_TOKEN="your_token"

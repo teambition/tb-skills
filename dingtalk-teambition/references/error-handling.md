@@ -9,7 +9,7 @@
 **解决**：
 1. 检查环境变量：`echo $TEAMBITION_USER_TOKEN`
 2. 检查 `user-token.json` 是否存在且格式正确：`{"userToken": "your_token"}`
-3. 重新获取 Token
+3. 重新获取 Token，参考 [如何获取 User Token](#如何获取-user-token)
 
 ---
 
@@ -77,15 +77,19 @@ uv run scripts/query_members.py --keyword 'zhangsan@company.com'
 
 ---
 
-### 脚本找不到 Token
+### 如何获取 User Token
 
-**现象**：`❌ 无法获取 User Token`
+**方式：Teambition UserToken 自助申请（推荐）**
 
-**解决**：
-```bash
-# 方式 1：环境变量
-export TEAMBITION_USER_TOKEN="your_token_here"
+通过官方自助申请页面获取 User Token：
 
-# 方式 2：配置文件（在 teambition/ 目录下创建）
-echo '{"userToken": "your_token_here"}' > user-token.json
-```
+1. 访问 [Teambition UserToken自助申请](https://open.teambition.com/user-mcp)
+2. 按页面提示完成申请流程
+3. 获取 Token 后，将其配置到环境变量或配置文件中：
+   ```bash
+   # 方式 1：设置环境变量
+   export TEAMBITION_USER_TOKEN="your_token_here"
+   
+   # 方式 2：写入配置文件（在 dingtalk-teambition/ 目录下创建）
+   echo '{"userToken": "your_token_here"}' > user-token.json
+   ```

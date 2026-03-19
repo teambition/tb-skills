@@ -32,7 +32,7 @@ export TEAMBITION_USER_TOKEN="your_teambition_user_token"
 {"userToken": "your_teambition_user_token"}
 ```
 
-> 获取 User Token：[Teambition 开放平台](https://open.teambition.com/user-mcp)
+> 获取 User Token：[Teambition UserToken自助申请](https://open.teambition.com/user-mcp)
 
 ## 快速开始
 
@@ -151,5 +151,4 @@ dingtalk-teambition/
 
 ## 相关链接
 
-- [Teambition 开放平台](https://open.teambition.com/)
 - [SKILL.md](./SKILL.md) - 完整使用文档
