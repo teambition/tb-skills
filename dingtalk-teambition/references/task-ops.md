@@ -76,20 +76,20 @@ uv run scripts/create_comment.py \
   --mention '张三'
 ```
 
-### 带附件的评论（先上传文件，再附加到评论）
+### 带附件的评论（使用 --file-paths 自动上传）
 
 ```bash
-# 第一步：上传文件，获取 fileToken
-uv run scripts/upload_file.py \
-  --file-path '/path/to/doc.pdf' \
-  --scope 'task:xxx' \
-  --category attachment
-
-# 第二步：将 fileToken 附加到评论（支持逗号分隔多个 token）
+# 单个文件
 uv run scripts/create_comment.py \
   --task-id 'xxx' \
-  --content '附件已上传，请查收' \
-  --file-tokens 'token1'
+  --content '附件请查收' \
+  --file-paths '/path/to/doc.pdf'
+
+# 多个文件
+uv run scripts/create_comment.py \
+  --task-id 'xxx' \
+  --content '附件请查收' \
+  --file-paths '/path/a.pdf,/path/b.png'
 ```
 
 ### 直接调用 API
@@ -106,6 +106,40 @@ POST v3/task/{taskId}/comment
   "mentionUserIds": ["userId1"],
   "fileTokens": ["fileToken1"]
 }
+```
+
+---
+
+## 文件上传到自定义字段
+
+将文件上传到任务的文件类型自定义字段（一站式操作，支持多文件）。
+
+### 使用 upload_file_to_customfield.py
+
+```bash
+# 上传单个文件
+uv run scripts/upload_file_to_customfield.py \
+  --task-id 'xxx' \
+  --file-paths '/path/to/document.pdf' \
+  --customfield-id 'cf_xxx'
+
+# 上传多个文件
+uv run scripts/upload_file_to_customfield.py \
+  --task-id 'xxx' \
+  --file-paths '/path/a.pdf,/path/b.png' \
+  --customfield-id 'cf_xxx'
+```
+
+### 查找自定义字段 ID
+
+```bash
+# 第一步：获取任务的 sfcId
+uv run scripts/query_task_detail.py <taskId> --detail-level detailed
+
+# 第二步：获取字段列表
+uv run scripts/get_custom_fields.py <projectId> --sfc-id <sfcId>
+
+# 第三步：找到 type 为 'work' 的字段，其 ID 即为文件类型自定义字段 ID
 ```
 
 ---

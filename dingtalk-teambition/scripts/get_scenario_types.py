@@ -38,15 +38,15 @@ def main() -> None:
 
 选项:
   --sfc-ids <IDs>     任务类型 ID 列表，逗号分隔（可选）
-  --q <关键词>        按名称模糊搜索任务类型（可选）
+  --name <关键词>     按名称模糊搜索任务类型（可选）
 
 示例:
   # 获取项目所有任务类型
   uv run scripts/get_scenario_types.py 67ec9b8c3c6130ac88605c3e
 
   # 按名称搜索任务类型
-  uv run scripts/get_scenario_types.py 67ec9b8c3c6130ac88605c3e --q 需求
-  uv run scripts/get_scenario_types.py 67ec9b8c3c6130ac88605c3e --q 缺陷
+  uv run scripts/get_scenario_types.py 67ec9b8c3c6130ac88605c3e --name 需求
+  uv run scripts/get_scenario_types.py 67ec9b8c3c6130ac88605c3e --name 缺陷
 
   # 获取指定 ID 的任务类型
   uv run scripts/get_scenario_types.py 67ec9b8c3c6130ac88605c3e \\
@@ -67,7 +67,7 @@ def main() -> None:
         if arg == "--sfc-ids" and i + 1 < len(sys.argv):
             sfc_ids = sys.argv[i + 1]
             i += 2
-        elif arg == "--q" and i + 1 < len(sys.argv):
+        elif arg == "--name" and i + 1 < len(sys.argv):
             q = sys.argv[i + 1]
             i += 2
         else:

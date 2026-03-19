@@ -127,3 +127,57 @@ def search_member(name: str) -> str:
     for m in members:
         print(f"   - {m.get('name', '?')} (userId: {m.get('userId', '?')}, email: {m.get('email', '?')})", file=sys.stderr)
     sys.exit(1)
+
+# ---------- 文件上传 ----------
+
+def upload_single_file(file_path: str, scope: str, category: str) -> str:
+    """
+    完整上传流程：获取凭证 → PUT 到 OSS → 返回 fileToken。
+    失败时 exit(1)。
+
+    Args:
+        file_path: 本地文件路径
+        scope: 业务范围，如 task:<taskId> 或 task:<taskId>/attachment
+        category: 文件类别，如 attachment / work
+    Returns:
+        fileToken 字符串
+    """
+    import mimetypes
+    import os
+
+    if not os.path.exists(file_path):
+        print(f"❌ 文件不存在: {file_path}", file=sys.stderr)
+        sys.exit(1)
+
+    file_name = os.path.basename(file_path)
+    file_size = os.path.getsize(file_path)
+    file_type = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
+
+    print(f"  📄 {file_name} ({file_size} bytes, {file_type})", file=sys.stderr)
+
+    # Step 1: 获取上传凭证
+    token_data = post("v3/awos/upload-token", {
+        "scope": scope,
+        "fileSize": file_size,
+        "fileType": file_type,
+        "fileName": file_name,
+        "category": category,
+    })
+    result = token_data.get("result", {})
+    upload_url: Optional[str] = result.get("uploadUrl")
+    file_token: Optional[str] = result.get("token")
+
+    if not upload_url or not file_token:
+        print(f"❌ 获取上传凭证失败，响应: {result}", file=sys.stderr)
+        sys.exit(1)
+
+    # Step 2: PUT 文件到 OSS
+    with open(file_path, "rb") as f:
+        resp = requests.put(upload_url, data=f, timeout=120)
+
+    if resp.status_code not in (200, 204):
+        print(f"❌ OSS 上传失败 (HTTP {resp.status_code}): {resp.text[:200]}", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"  ✅ 上传成功，fileToken: {file_token}", file=sys.stderr)
+    return file_token

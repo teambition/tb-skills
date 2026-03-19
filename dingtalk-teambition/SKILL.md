@@ -109,7 +109,7 @@ cd dingtalk-teambition && uv sync
 7. **迭代操作顺序**：先用 `--action create --project-id <id> --name <名>` 创建迭代获取 sprint-id，再用 `--action start --project-id <id> --sprint-id <id>` 开始，完成后用 `--action complete --project-id <id> --sprint-id <id>`；start/complete 都需要同时传 `--project-id` 和 `--sprint-id`
 8. **状态查询优先**：更新任务状态时，优先使用 `get_task_statuses.py <taskId>` 直接查询该任务的工作流状态列表，无需先获取 projectId；只有创建任务需要初始状态时才用 `get_taskflow_statuses.py`
 9. **按需读文档**：TQL 语法 → `references/tql.md`；进展/评论/动态/归档 → `references/task-ops.md`；错误处理 → `references/error-handling.md`
-10. **文件上传流程**：先用 `upload_file.py` 上传文件获取 `fileToken`，再用 `create_comment.py --file-tokens <token>` 将文件附加到评论；两步均走脚本，无需直接调 API
+10. **带文件创建评论**：使用 `create_comment.py --file-paths <路径>` 直接上传并附加文件到评论，支持多文件（逗号分隔）
 11. **ID 链接渲染**：当回复中涉及任务 ID 或项目 ID 时，必须将其渲染为可点击的链接，格式如下：
     - 任务链接：`https://www.teambition.com/task/{taskId}`
     - 项目链接：`https://www.teambition.com/project/{projectId}`
@@ -135,11 +135,18 @@ cd dingtalk-teambition && uv sync
       --customfields '[{"customfieldId": "字段ID", "value": [{"id": "选项ID"}]}]'
     ```
 
-15. **文件类型自定义字段上传**：使用 `upload_file_to_customfield.py` 一站式上传文件到自定义字段：
+15. **文件类型自定义字段上传**：使用 `upload_file_to_customfield.py --file-paths` 一站式上传一个或多个文件到自定义字段：
     ```bash
+    # 上传单个文件
     uv run scripts/upload_file_to_customfield.py \
       --task-id '<taskId>' \
-      --file-path '/path/to/file.pdf' \
+      --file-paths '/path/to/file.pdf' \
+      --customfield-id '<字段ID>'
+    
+    # 上传多个文件（逗号分隔）
+    uv run scripts/upload_file_to_customfield.py \
+      --task-id '<taskId>' \
+      --file-paths '/path/a.pdf,/path/b.png' \
       --customfield-id '<字段ID>'
     ```
 
@@ -165,6 +172,21 @@ cd dingtalk-teambition && uv sync
     ```
     返回结果中 type 为 `work` 的字段就是文件类型字段
 
+20. **任务类型感知**：创建任务时，根据用户描述的关键词自动推断任务类型，**不要默认创建普通任务**：
+    - 用户说"需求"/"功能"/"feature" → 用 `--name 需求` 搜索匹配的任务类型
+    - 用户说"缺陷"/"bug"/"问题" → 用 `--name 缺陷` 搜索匹配的任务类型
+    - 用户说"任务"或未明确指定 → 用 `--name 任务` 搜索，或使用项目默认类型
+    - 操作流程：
+      1. 确定 projectId 后，先执行 `uv run scripts/get_scenario_types.py <projectId> --name <关键词>` 查询匹配的任务类型
+      2. 若找到唯一匹配，直接使用其 `id` 作为 `--scenariofieldconfig-id` 参数
+      3. 若找到多个匹配，选择名称最接近用户意图的一个
+      4. 若未找到匹配，不传 `--scenariofieldconfig-id`，使用项目默认类型
+
+21. **项目智能推断**：创建任务时，若用户未指定项目，**不要随机选择项目**，按以下流程处理：
+    1. 执行 `uv run scripts/query_projects.py --tql "involveMembers = me()"` 查询用户参与的项目
+    2. 若只有 **1 个**项目，自动使用该项目，并告知用户
+    3. 若有 **多个**项目，展示项目列表（名称+ID），询问用户选择哪个项目后再创建
+
 ---
 
 ## 脚本速查
@@ -176,18 +198,18 @@ cd dingtalk-teambition && uv sync
 | `create_task.py` | 创建任务 | `--title <标题>`（必需）`--project-id` `--executor-id` `--due-date` `--priority` |
 | `update_task.py` | 更新任务（多字段并行） | `--task-id <id>`（必需）`--title` `--executor-id` `--due-date` `--note` `--priority` `--taskflowstatus-id` |
 | `update_task_priority.py` | 单独更新优先级（更新前必须先用 `get_priority_list.py` 查企业配置） | `--task-id <id>` `--priority <0-3>` |
-| `create_comment.py` | 创建评论 | `--task-id <id>` `--content <内容>` `--mention <姓名>` `--mention-id <userId>` `--file-tokens <token>` |
+| `create_comment.py` | 创建评论（支持直接上传文件） | `--task-id <id>` `--content <内容>` `--mention <姓名>` `--mention-id <userId>` `--file-paths <路径>` `--file-tokens <token>` |
 | `query_projects.py` | 查询项目列表（TQL） | `--tql <TQL>` `--page-size N` `--page-token T` `--no-details` `--include-template` |
 | `query_project_detail.py <id>` | 查询项目详情（支持批量） | `--detail-level simple\|detailed` `--extra-fields f1,f2` |
 | `query_members.py` | 搜索成员（支持批量ID查询） | `--keyword <姓名>` `--user-ids <ID1,ID2,...>` |
-| `get_task_statuses.py <taskId>` | 查询任务工作流状态列表（推荐） | `--q <关键词>` |
-| `get_taskflow_statuses.py <projectId>` | 获取项目工作流状态（创建任务时用） | `--only-start` `--q <关键词>` |
+| `get_task_statuses.py <taskId>` | 查询任务工作流状态列表（推荐） | `--name <关键词>` |
+| `get_taskflow_statuses.py <projectId>` | 获取项目工作流状态（创建任务时用） | `--only-start` `--name <关键词>` |
 | `get_custom_fields.py <projectId>` | 获取项目自定义字段配置 | `--cf-ids <IDs>` `--sfc-id <ID>` |
-| `get_scenario_types.py <projectId>` | 获取项目任务类型列表 | `--q <关键词>` `--sfc-ids <IDs>` |
+| `get_scenario_types.py <projectId>` | 获取项目任务类型列表 | `--name <关键词>` `--sfc-ids <IDs>` |
 | `get_priority_list.py <organizationId>` | 获取企业优先级配置 | — |
 | `get_current_user.py` | 获取当前登录用户信息（userId、name、email 等） | — |
 | `create_trace.py` | 添加任务进展 | `--task-id <id>` `--title <标题>` `--status <1-3>` |
-| `upload_file.py` | 上传文件，返回 `fileToken` | `--file-path <路径>` `--scope task:<id>` `--category attachment` |
+| `upload_file_to_customfield.py` | 上传文件到自定义字段（支持多文件） | `--task-id <id>` `--file-paths <路径>` `--customfield-id <id>` |
 | `archive_task.py` | 归档/恢复任务 | `--task-id <id>` `[--restore]` |
 | `query_task_activity.py` | 查询任务动态 | `--task-id <id>` `--actions comment` |
 | `manage_sprint.py` | 迭代管理 | `--action list\|create\|start\|complete` `--project-id <id>` `--sprint-id <id>` `--name <名>` |
@@ -397,20 +419,43 @@ uv run scripts/create_comment.py \
   --mention-id '61cad8021deea2ac89a4cbf3'
 ```
 
-### 文件上传
+### 带文件创建评论
 
 ```bash
-# 第一步：上传文件，获取 fileToken
-uv run scripts/upload_file.py \
-  --file-path '/path/to/doc.pdf' \
-  --scope 'task:<taskId>' \
-  --category attachment
-
-# 第二步：将 fileToken 附加到评论
+# 带单个文件创建评论（自动上传并附加）
 uv run scripts/create_comment.py \
   --task-id 'xxx' \
-  --content '附件已上传，请查收' \
-  --file-tokens 'token1'
+  --content '附件请查收' \
+  --file-paths '/path/to/doc.pdf'
+
+# 带多个文件创建评论（逗号分隔）
+uv run scripts/create_comment.py \
+  --task-id 'xxx' \
+  --content '附件请查收' \
+  --file-paths '/path/a.pdf,/path/b.png'
+
+# 同时使用文件路径和已有 token（混合使用）
+uv run scripts/create_comment.py \
+  --task-id 'xxx' \
+  --content '附件请查收' \
+  --file-paths '/path/to/new.pdf' \
+  --file-tokens 'existing_token1,existing_token2'
+```
+
+### 带文件更新文件字段
+
+```bash
+# 上传单个文件到自定义字段
+uv run scripts/upload_file_to_customfield.py \
+  --task-id 'xxx' \
+  --file-paths '/path/to/document.pdf' \
+  --customfield-id 'yyy'
+
+# 上传多个文件到自定义字段（逗号分隔）
+uv run scripts/upload_file_to_customfield.py \
+  --task-id 'xxx' \
+  --file-paths '/path/a.pdf,/path/b.png,/path/c.docx' \
+  --customfield-id 'yyy'
 ```
 
 ---

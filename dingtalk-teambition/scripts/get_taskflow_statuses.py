@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 获取 Teambition 项目工作流状态列表
-用法: uv run scripts/get_taskflow_statuses.py <projectId> [--taskflow-id <ID>] [--q <关键词>] [--only-start]
+用法: uv run scripts/get_taskflow_statuses.py <projectId> [--taskflow-id <ID>] [--name <关键词>] [--only-start]
 """
 
 import json
@@ -41,14 +41,14 @@ def main() -> None:
 
 选项:
   --taskflow-id <ID>     指定工作流 ID
-  --q <关键词>           按状态名称模糊搜索
+  --name <关键词>        按状态名称模糊搜索
   --only-start           只返回 kind=start 的状态（可用于创建任务的初始状态）
   --help                 显示帮助
 
 示例:
   uv run scripts/get_taskflow_statuses.py 67ec9b8c3c6130ac88605c3e
   uv run scripts/get_taskflow_statuses.py 67ec9b8c3c6130ac88605c3e --only-start
-  uv run scripts/get_taskflow_statuses.py 67ec9b8c3c6130ac88605c3e --q '进行中'""")
+  uv run scripts/get_taskflow_statuses.py 67ec9b8c3c6130ac88605c3e --name '进行中'""")
         sys.exit(0 if "--help" in sys.argv else 1)
 
     project_id = sys.argv[1]
@@ -61,7 +61,7 @@ def main() -> None:
         arg = sys.argv[i]
         if arg == "--taskflow-id" and i + 1 < len(sys.argv):
             taskflow_id = sys.argv[i + 1]; i += 2
-        elif arg == "--q" and i + 1 < len(sys.argv):
+        elif arg == "--name" and i + 1 < len(sys.argv):
             q = sys.argv[i + 1]; i += 2
         elif arg == "--only-start":
             only_start = True; i += 1

@@ -77,7 +77,6 @@ uv run scripts/query_projects.py --tql "involveMembers = me()"
 | `get_task_statuses.py`    | 查询任务工作流状态         |
 | `get_priority_list.py`    | 获取企业优先级配置         |
 | `get_custom_fields.py`    | 获取项目自定义字段         |
-| `upload_file.py`          | 上传文件                   |
 | `query_task_activity.py`  | 查询任务动态               |
 
 ## TQL 查询示例

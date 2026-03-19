@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 查询任务所在工作流的任务状态列表
-用法: uv run scripts/get_task_statuses.py <taskId> [--q <关键词>]
+用法: uv run scripts/get_task_statuses.py <taskId> [--name <关键词>]
 
 优势：只需 taskId 即可查询，无需先获取 projectId
 API: GET /v3/task/{taskId}/tfs
@@ -33,18 +33,18 @@ def get_task_statuses(task_id: str, q: Optional[str] = None) -> None:
 
 def main() -> None:
     if len(sys.argv) < 2 or "--help" in sys.argv:
-        print("""用法: uv run scripts/get_task_statuses.py <taskId> [--q <关键词>]
+        print("""用法: uv run scripts/get_task_statuses.py <taskId> [--name <关键词>]
 
 参数:
   taskId          任务 ID（必需）
 
 选项:
-  --q <关键词>    按状态名称模糊搜索
+  --name <关键词> 按状态名称模糊搜索
   --help          显示帮助
 
 示例:
   uv run scripts/get_task_statuses.py 69b2ad9501c321cc9c927eaf
-  uv run scripts/get_task_statuses.py 69b2ad9501c321cc9c927eaf --q '进行中'
+  uv run scripts/get_task_statuses.py 69b2ad9501c321cc9c927eaf --name '进行中'
 
 说明:
   直接通过任务 ID 查询该任务所在工作流的所有状态列表。
@@ -58,7 +58,7 @@ def main() -> None:
     i = 2
     while i < len(sys.argv):
         arg = sys.argv[i]
-        if arg == "--q" and i + 1 < len(sys.argv):
+        if arg == "--name" and i + 1 < len(sys.argv):
             q = sys.argv[i + 1]
             i += 2
         else:

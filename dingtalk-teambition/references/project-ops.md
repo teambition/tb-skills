@@ -14,7 +14,7 @@ uv run scripts/get_taskflow_statuses.py <projectId>
 uv run scripts/get_taskflow_statuses.py <projectId> --only-start
 
 # 按名称搜索
-uv run scripts/get_taskflow_statuses.py <projectId> --q '进行中'
+uv run scripts/get_taskflow_statuses.py <projectId> --name '进行中'
 ```
 
 返回字段：
