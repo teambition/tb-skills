@@ -48,10 +48,17 @@ def load_token() -> str:
 
 
 def _headers() -> Dict[str, str]:
-    return {
+    headers = {
         "Authorization": f"Bearer {load_token()}",
         "Content-Type": "application/json",
     }
+    
+    # 支持 TEAMBITION_REQUEST_SOURCE 环境变量，目前仅支持 dingtalk
+    request_source = os.environ.get("TEAMBITION_REQUEST_SOURCE")
+    if request_source == "dingtalk":
+        headers["X-Request-Source"] = "dingtalk"
+    
+    return headers
 
 
 # ---------- HTTP 方法 ----------
